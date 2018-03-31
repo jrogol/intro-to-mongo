@@ -27,7 +27,7 @@ export PATH="~/mongodb-osx-x86_64-enterprise-3.6.3/bin:$PATH"
 - Create an environment via terminal:
   -
   ``` bash
-  conda create -n intro-to-Mongodb
+  conda create -n intro-to-mongodb
   ```
 - Activate the environment:
   ``` bash
@@ -60,6 +60,9 @@ export PATH="~/mongodb-osx-x86_64-enterprise-3.6.3/bin:$PATH"
 mongoimport --type csv --headerline --db mflix --collection movies_initial --host "<CLUSTER>/<SEED_LIST>" --authenticationDatabase admin --ssl --username analytics --password analytics-password --file movies_initial.csv
 ```
 - Once run, the import states how many documents were uploaded.
+
+## Using Compass
+-
 
 
 #### System Information
