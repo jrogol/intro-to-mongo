@@ -80,7 +80,6 @@ from pymongo import MongoClient
 client = MongoClient(mongoURI)
 print(client.mflix)
 ```
-
 ## Aggregation framework
 - General idea: take data from a collection, pass it through several *stages* (operations), and produce an output.
   - Inputs/outputs of all stages are documents (a stream of documents).
@@ -211,8 +210,26 @@ pprint.pprint(list(client.mflix.movies_initial.aggregate(pipeline)))
 
 ## Filtering
 - Try and obtain documents which match certain criteria.
-
-
+  - via Compass, `$match` or `find` in Python
+  - filter syntax is based on documents - key is a field, and value is a...value
+- Aggregation framework
+```python
+pipeline = [
+  {'$match' : {'language' : 'Korean, English'}
+  }
+]
+```
+- Query language
+``` python
+filter = {'language' : 'Korean, English'}
+pprint.pprint(list(client.mflix.movies_initial.find(filter)))
+```
+  - Find returns a cursor in Mongo, iterating over results.
+    - `list` in python tells the `find` method to produce a list.
+- In compass, same syntax applies, but *must* use double quotes `"`
+  - neednt quote keys here.
+- The above is an equality filter
+  - can combine filters, separating with a comma.
 
 #### System Information
 
