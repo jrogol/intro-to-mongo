@@ -49,7 +49,7 @@ export PATH="~/mongodb-osx-x86_64-enterprise-3.6.3/bin:$PATH"
   ``` bash
   jupyter notebook
   ```
-  - And access via http://localhost:8888 in a web browset.
+  - And access via http://localhost:8888 in a web browser.
 
 ## Importing to an Atlas cluster
 
@@ -60,6 +60,11 @@ export PATH="~/mongodb-osx-x86_64-enterprise-3.6.3/bin:$PATH"
 mongoimport --type csv --headerline --db mflix --collection movies_initial --host "<CLUSTER>/<SEED_LIST>" --authenticationDatabase admin --ssl --username analytics --password analytics-password --file movies_initial.csv
 ```
 - Once run, the import states how many documents were uploaded.
+- For a local instance, use the following, as there's no user name, nor password (initially)
+
+``` bash
+mongoimport --type csv --headerline --db mflix --collection movies_initial --file movies_initial.csv
+```
 
 ## Using Compass
 - GUI for mongodb
