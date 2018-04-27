@@ -543,3 +543,20 @@ pprint.pprint(list(client.mflix.movies_initial.find(filter, projection)))
   - These projections explicitly include fields with a `1`, and exclude them with `0`
   - `_id` field is always included, unless explicitly excluded.
   - Order of the returned projections is as stated in the dictionary.
+
+## How MFlix works with MongoDB
+
+- Mflix runs on `flask` a python web interface.
+- `db.py` controls access/connection to the database.
+- `mflix.py` contains the flask app
+  - uses methods in `db.py` to complete requests
+  - `auth.py` controls log in/out
+
+## Sort, Skip and limit
+
+- `sort()`, `skip()`, and `limit()` are cursor methods
+- Homepage of MFlix only displays 20 titles (from a 40k+ database)
+  - in `mflix.py`, the `@app.route('/')` indicates what the app should do when in the '/' directory of the web app (and the method called when the page is visited)
+  - `get_movies()` accepts filters, the page, and the movies per page.
+    - returns the list of films when called.
+    - defined in `db.py` (and below)
