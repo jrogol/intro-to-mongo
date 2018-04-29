@@ -560,3 +560,312 @@ pprint.pprint(list(client.mflix.movies_initial.find(filter, projection)))
   - `get_movies()` accepts filters, the page, and the movies per page.
     - returns the list of films when called.
     - defined in `db.py` (and below)
+    - `sort_key` returns movies by number of reviews
+      - `.sort` uses same dot notation for nested documents (i.e. wehn filtering)
+    - `.skip(x)` removes x documents from the documents retreived in `movies`
+    - `.limit(x)` returns x documents from the remaining list (after skipping)      
+
+``` python
+from pymongo import MongoClient, DESCENDING
+import pprint
+
+# Replace XXXX with your connection URI from the Atlas UI
+course_cluster_uri = "localhost:27017"
+
+course_client = pymongo.MongoClient(course_cluster_uri)
+db = course_client['mflix']
+
+filters = {}
+page = 0
+movies_per_page = 20
+
+sort_key = "tomatoes.viewer.numReviews"
+​
+# DESCENDING to return most first!
+movies = db.movies.find(filters) \
+                  .sort(sort_key, DESCENDING)
+
+# count number of total movie documents
+total_num_movies = movies.count()
+pprint.pprint(total_num_movies)
+
+# limit records based on page number
+movies.skip(movies_per_page * page) \
+               .limit(movies_per_page)
+
+movie_list = list(movies)
+
+len(movie_list)
+
+movie_list[0]
+
+# Simulate going to the next page
+page = 1
+
+movies = db.movies.find(filters) \
+                  .sort(sort_key, DESCENDING) \
+                  .skip(movies_per_page * page)
+
+# 20 fewer movies, since we're on page 2 (index 1)
+len(list(movies))
+```
+
+## Query movies using operators
+- `$gte` is greater than or equal to.
+- `$lt` is less than!
+- `$in` can take an array of values and returns any matching entried!
+  - `$nin` is the opposite
+- `$eq` is equal to.
+  - to negate, nest dictionaries, with the first (outermost) key being `$not`
+- Queries are dictionary-esque structures on a field (i.e. `year`)
+- Additional logical and element operators cab be found in the docs:
+  - [Query and Projection Operators](https://docs.mongodb.com/manual/reference/operator/query/)
+
+
+``` python
+import pymongo
+import pprint
+
+# Replace XXXX with your connection URI from the Atlas UI\n",
+mc = pymongo.MongoClient("localhost:27017")
+mflix = mc['mflix']
+
+# find all movies released from 1983 onwards\n",
+filters = {'year': { '$gte': 1983 }}
+
+for movie in mflix.movies.find(filters):
+    pprint.pprint(movie['title'])
+
+# find all movies between 1989 and 1999\n",
+filters = { 'year': {'$gte': 1989, '$lt': 2000} }
+
+for movie in mflix.movies.find(filters):
+    pprint.pprint(movie['title'])
+
+# find all movies released in 1995, 2005, 2015\n",
+filters = { 'year': { '$in': [ 1995, 2005, 2015 ] } }
+for movie in mflix.movies.find(filters):
+    pprint.pprint(movie['title'])
+
+# find all movies except the ones which are of adult genre\n",
+filters = { 'year': { '$in': [ 1995, 2005, 2015 ] },
+                     'genre': { '$not' : {'$eq': 'Adult'} } }
+for movie in mflix.movies.find(filters):
+    pprint.pprint(movie['title'])
+```
+
+## The `$elemMatch` Operator
+
+- Useful when querying subdocuments embedded in an array
+  - Here, `comments` stores each comment and meta data as a subdocument within an array.
+- Can query embedded documents using dot notation
+  - To search on `name` within `comments` - `{'comment.name' : 'James'}`
+  - But! When combining multiple queries, it's not restricted to one document within an array - so the name and date could be in separate subdocuments.
+- `$elemMatch` makes sure both conditions are met within the same document.
+
+``` python
+# When you put a bang (exclamation point) at the beginning of a line, everything that follows
+# will be executed in your terminal.
+#
+# In this case, we're using pip to install the dateparser module.
+# This module will help us parse datetimes from strings.
+!pip install dateparser
+
+import pymongo
+import pprint
+import dateparser
+
+# Replace XXXX with your connection URI from the Atlas UI
+course_cluster_uri = "localhost:27017"
+
+course_client = pymongo.MongoClient(course_cluster_uri)
+movies = course_client['mflix']['movies']
+
+# Find a document with comments, and return just the comments field.
+query = {"comments":{"$exists": True}}
+projection = {"comments": 1}
+​
+movie = movies.find_one(query, projection)
+​
+pprint.pprint(movie)
+
+query = {"comments.name": "Samwell Tarly"}
+
+movie = movies.find_one(query, projection)
+​
+pprint.pprint(movie)
+
+query = {
+  "comments.name": "Samwell Tarly",
+  "comments.date": {
+    "$lt": dateparser.parse("1995-01-01")
+  }
+}
+​
+movie = movies.find_one(query, projection)
+​
+pprint.pprint(movie)
+
+movie = movies.find(query, projection).skip(1).limit(1)
+​
+pprint.pprint(list(movie))
+
+betterQuery = {
+  "comments": {
+    "$elemMatch": {
+      "name": "Samwell Tarly",
+      "date": {
+        "$lt": dateparser.parse("1995-01-01")
+      }
+    }
+  }
+}
+​
+correctMovies = list(movies.find(betterQuery, projection).limit(2))
+​
+pprint.pprint(correctMovies)
+```
+## Querying on Rotten Tomatoes Subdocuments
+
+- Use dot notation to access nested elements within an array.
+
+
+``` python
+
+import pymongo
+import pprint
+
+# Replace XXXX with your connection URI from the Atlas UI
+uri = "localhost:27017"
+mc = pymongo.MongoClient(uri)
+mflix = mc.mflix
+
+# Find `Titanic` movie
+titanic = mflix.movies.find_one({'title': 'Titanic'})
+​
+pprint.pprint(titanic)
+
+# tomatoes contains nested documents of Rotten Tomatoes data.
+titanic["tomatoes"]
+
+titanic["tomatoes"]["viewer"]
+
+rating = titanic["tomatoes"]["viewer"]["rating"]
+rating
+
+# find all movies with the same viewer rating as `Titanic`
+cursor = mflix.movies.find({'tomatoes.viewer.rating': rating })
+for movie in cursor:
+    pprint.pprint(movie['title'])
+
+# find all movies with `Titanic` rating and sort by lastUpdated review
+cursor = mflix.movies.find({'tomatoes.viewer.rating': rating })
+# Sort by oldest to newest, which modifies the cursor in place
+cursor.sort('tomatoes.lastUpdated', pymongo.ASCENDING)
+for movie in cursor:
+    pprint.pprint( "Title: {0}; LastUpdated: {1}".format( movie['title'],movie['tomatoes']['lastUpdated']))
+​
+```
+
+## Inserting Comments into MFlix
+
+- Since `comments` is an array of subdocuments, we're inserting a dictionary.
+- `bypass_validation` flag is set to false
+  - validation is on the collection level.
+
+``` python
+# Connect to Atlas
+
+import pymongo
+import pprint
+import bson.objectid
+from datetime import datetime
+
+# Replace XXXX with your connection URI from the Atlas UI
+uri = "localhost:27017"
+mc = pymongo.MongoClient(uri)
+mflix = mc['mflix']
+print(mflix)
+
+
+# Insert a single document
+
+# fake comment, in a dictionary
+comment = {
+    "name": "some users's name",
+    "email": "someuser@email.com",
+    "movie_id": bson.objectid.ObjectId(),
+    "text": "some nice comment on our movie",
+    "date": datetime.utcnow()
+    }
+
+bypass_validation = False
+
+insert_result = mflix.comments.insert_one(comment, bypass_validation)
+
+# Was it acknowledged by the server?
+pprint.pprint(insert_result.acknowledged)
+
+# Mongo creates an insert ID if none is provided.
+pprint.pprint(insert_result.inserted_id)
+# Insert document providing _id value
+
+# another fake comment
+comment = {
+    "_id": "some_id_field",
+    "name": "some users's name",
+    "email": "someuser@email.com",
+    "movie_id": bson.objectid.ObjectId(),
+    "text": "Hi, it's me again!",
+    "date": datetime.utcnow()
+    }
+insert_result = mflix.comments.insert_one(comment, bypass_validation)
+pprint.pprint(insert_result.acknowledged)
+pprint.pprint(insert_result.inserted_id)
+# Duplicate documents will raise error
+
+# _id must be unique, so it throws an error for Duplicate keys!
+comment = {
+    "_id": "some_id_field"}
+insert_result = mflix.comments.insert_one(comment, bypass_validation)
+
+```
+
+## Updating Comments
+
+- [Advanced Schema Design Patterns](https://www.slideshare.net/mongodb/advanced-schema-design-patterns?jmp=coursera-intro-mongodb)
+
+## Deleting Data in MFlix
+
+``` python
+import pymongo
+from bson.objectid import ObjectId
+
+# Replace XXXX with your connection URI from the Atlas UI
+course_cluster_uri = "localhost:27017"
+
+course_client = pymongo.MongoClient(course_cluster_uri)
+comments = course_client['mflix']['comments']
+
+filter = {"text": "What a great movie."}
+
+list(comments.find(filter))
+
+comments.delete_one(filter)
+
+list(comments.find(filter))
+
+titanic_id = ObjectId("573a139af29313caabcf0d74")
+titanic_filter = {"movie_id": titanic_id}
+comments.delete_many(titanic_filter)
+
+movies = course_client['mflix']['movies']
+update_doc = {
+    "$set": {
+        "comments": [],
+        "num_mflix_comments": 0
+    }
+}
+movies.update_one(titanic_filter, update_doc)
+
+```
