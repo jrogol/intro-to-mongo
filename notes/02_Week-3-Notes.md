@@ -1,6 +1,29 @@
 # Week 3 (Through April 21)
 
-## Indexes in Movies (Part 1)
+## Indexes in Movies (Parts 1 and 2)
+- App makes several queries to database, i.e. clicking on a movie for details
+  - `get_movie` method in `db.py` - works off of `_id`
+  - Or the search functionality
+  - indices in the `movies` collection are the key.
+    - Can make queries faster.
+- `.index_information()` method has *four* available indexes.
+  - `_id` and 3 user-defined indices.
+  - lists keys available, the `1` or `-1` indicates ascending or descending order.
+  - Can be combinations of values, across multiple fields (a **compound index**)
+- More indexes mean faster reads
+  - but slower writes
+  - Maximum of 64 indices per collection
+- Queries occur in stages (the `explain` command reveals the details)
+  - i.e. `COLLSCAN`, which searches every column
+  - `winningPlan` reveals if an inex was used.
+- `title_text_cast_text_directors_text` is another index
+  - Text indices don't follow the exact match
+  - Rather, how relevant is a key to the entries in an index.
+- `$find` looks for *exact* matches
+  - but a `$text` search in a filter is more of a fuzzy match
+    - case insensitve, or relevance (stemming, stopwords, etc.)
+      - but can only specify one per collection in mongoDB
+- `.create_index()` method takes an array of tuples. The field to be indexed, and the order inwhich they are ordered (or a text or geometric index.)
 
 ``` python
 import pymongo
@@ -16,7 +39,8 @@ mflix = mc.mflix
 pprint.pprint(mflix.movies.index_information())
 
 pprint.pprint(mflix.movies.find_one())
-Explain a Query
+
+# Explain a Query
 
 explain = {
     "explain": {
@@ -47,10 +71,21 @@ for m in mflix.movies.find(filters):
 mflix.movies.create_index([("countries", pymongo.ASCENDING)])
 
 ```
-
-## Indexes in Movies (Part 2)
-
 ## Geospatial queries
+- Built in geographic queries!
+- In `mflix` there's the `theaters` collection
+  - contains geolocation of several theaters, alongside human-readable addresses.
+  - geoJSON format (i.e. 'point')
+- Enterprise version of Compass can analyze the schema, generating a map. A search area can then be produced, generating a query!
+  -`$geoWithin` operator can be used to search a particular field (`location.geo`, as it's embedded)
+    - two parameters, longitude, then latitude (backwards from tradition!) in an array
+    - Then radius of a circle, in RADIANS
+    - `$box`, `$polygon`, `$centerSphere` and `$geometry` work similarly.
+- `$nearSphere` is also similar, but returns documents in the order from the center point.
+  - `$geometry` is used to identify the center, and `$minDistance` and `$maxDistance` to set the distance parameters
+  - the **requires** a geospatial index to work
+-  In Compass, clicking Indexes > Create Index, and chosing `2dsphere` on the appropriate field will create this.
+
 
 ``` python
 import pymongo
@@ -94,13 +129,17 @@ for theater in theaters.find(query):
     pprint.pprint(theater)
 
 ```
-
-- [Geospatial Query Operators](https://docs.mongodb.com/manual/reference/operator/query-geospatial?jmp=coursera-intro-mongod)b
+### More information
+- [Geospatial Query Operators](https://docs.mongodb.com/manual/reference/operator/query-geospatial?jmp=coursera-intro-mongod)
 
 ## Graphing with MongoDB
 
+- `matplotlib` anticipates data in arrays.
+- `plt.clf()` clears the plot.
 ``` python
 import matplotlib.pyplot as plt
+%matplotlib inline
+
 
 a = [1, 2, 3, 4, 5]
 b = [x ** 2 for x in a]
@@ -113,7 +152,7 @@ fig, ax = plt.subplots()
 ​
 ax.scatter(a, b)
 ​
-plt.show()
+plt.scatter(a,b)
 
 import pymongo
 import pprint
@@ -126,14 +165,14 @@ movies = course_client['mflix']['movies']
 
 query = {
   "runtime": { "$exists": True },
-  "metacritic": { "$exists": True }     
-}
+  "metacritic": { "$exists": True }
+  }
 ​
 projection = {
   "_id": 0,
   "runtime": 1,
   "metacritic": 1
-}
+  }
 
 rm = list(movies.find(query, projection))
 
@@ -146,16 +185,14 @@ print(runtimes)
 metacritic_ratings = [movie['metacritic'] for movie in rm]
 
 plt.clf()
-​
 fig, ax = plt.subplots()
-​
 ax.scatter(runtimes, metacritic_ratings, alpha=0.5)
-​
 plt.title("Metacritic Movie Ratings vs. Movie Runtime")
 plt.xlabel('Movie Runtime (minutes)')
 plt.ylabel('Movie Rating (metacritic)')
-​
 plt.show()
+
+
 
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -163,14 +200,14 @@ query = {
   "runtime": { "$exists": True },
   "metacritic": { "$exists": True },
   "year": { "$exists": True }
-}
+  }
 ​
 projection = {
   "_id": 0,
   "runtime": 1,
   "metacritic": 1,
   "year": 1
-}
+  }
 
 rmy = list(movies.find(query, projection))
 
@@ -179,22 +216,22 @@ metacritic_ratings = [movie['metacritic'] for movie in rmy]
 years = [movie['year'] for movie in rmy]
 
 plt.clf()
-​
+
 fig = plt.figure()
-​
-ax = fig.add_subplot(111, projection='3d')
-​
+ax = fig.add_subplot(111, projection='3d')​
 ax.scatter(runtimes, metacritic_ratings, years)
-​
+
 plt.title('Movie Ratings vs. Runtime vs. Year')
 ax.set_xlabel('Movie Runtime (minutes)')
 ax.set_ylabel('Movie Rating (metacritic)')
 ax.set_zlabel('Movie Year')
-​
+
 plt.show()
 
 client = pymongo.MongoClient("mongodb://buildapp-student:buildapp-password@cluster0-shard-00-00-jxeqq.mongodb.net:27017,cluster0-shard-00-01-jxeqq.mongodb.net:27017,cluster0-shard-00-02-jxeqq.mongodb.net:27017/?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin")
 pings = client['mflix']['watching_pings']
+
+pings.find_one()
 
 cursor = pings.aggregate([
   {
@@ -212,7 +249,7 @@ cursor = pings.aggregate([
   {
     "$sort": { "_id": 1 }
   }
-]);
+  ]);
 
 pings_by_day = [doc['pings'] for doc in cursor]
 
@@ -221,14 +258,11 @@ pings_by_hour_by_day = [[ping['hourOfDay'] for ping in pings] for pings in pings
 plt.clf()
 ​
 fig, ax = plt.subplots()
-​
 ax.boxplot(pings_by_hour_by_day)
-​
 ax.set_title('When People Watch Movies')
 ax.yaxis.grid(True)
 ax.set_xticklabels(['Sun', 'Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat'])
 ax.set_xlabel('Day of Week')
 ax.set_ylabel('Hour of Day')
-​
 plt.show()
 ```
