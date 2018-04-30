@@ -833,10 +833,65 @@ insert_result = mflix.comments.insert_one(comment, bypass_validation)
 
 ## Updating Comments
 
+- Users can add comments in the app via `add_comment_to_movie()` method in `db.py`
+- A **subset** of data is used
+  - First updated in `movies` collection, and then into a collection of all Comments
+  - `$push` is used in `movies` collection
+    - saves bandwidth, just sends what's needed and not the whole document
+- `MOVIE_COMMENT_CACHE_LIMIT` limits the amount stored in a document
+  - prevents **unbounded arrays** by limiting the amount of data stored
+  - Optimized code but by taking only the most recent 10 comments.
+  - `$slice`, `$sort` and `$each` defines how values of the update array are used
+    - `$inc` increments the number of comments by 1
+    - `$each` appends the value (in this case, the `comment_doc` dictionary) to the array. Duplicates are ignored!
+  - Update operators allow inserts, but without asking for a counter or min/max without reading it. (all *server side*)
+
+
+``` python
+def add_comment_to_movie(movieid, user, comment, date):
+    MOVIE_COMMENT_CACHE_LIMIT = 10
+
+    comment_doc = {
+        "name": user.name,
+        "email": user.email,
+        "movie_id": movieid,
+        "text": comment,
+        "date": date
+    }
+
+    movie = get_movie(movieid)
+    if movie:
+        update_doc = {
+            "$inc": {
+                "num_mflix_comments": 1
+            },
+            "$push": {
+                "comments": {
+                    "$each": [comment_doc],
+                    "$sort": {"date": -1},
+                    "$slice": MOVIE_COMMENT_CACHE_LIMIT
+                }
+            }
+        }
+
+        # let's set an `_id` for the comments collection document
+        comment_doc["_id"] = "{0}-{1}-{2}".format(movieid, user.name, \
+            date.timestamp())
+
+        db.comments.insert_one( comment_doc )
+
+        db.movies.update_one({"_id": ObjectId(movieid)}, update_doc)
+```
 - [Advanced Schema Design Patterns](https://www.slideshare.net/mongodb/advanced-schema-design-patterns?jmp=coursera-intro-mongodb)
 
 ## Deleting Data in MFlix
-
+- `delete_one` and `delete_many` methods are used to remove Information
+- in the App, each comment checks to see if logged in user's email matches the one for a given comment and renders a button if needed.
+- in `mflix.py` is the `delete_movie_comment` menthod, which calls  `delete delete_comment_from_movie` in `db.py`
+  - Last 10 comments are cashed for a given movie.
+  - method operates on `ObjectId`, but any filter can be applied.
+  - deletes comment from `comment` collection
+  - in the app, comments will still show a count - the number is stored in the `movies` collection
 ``` python
 import pymongo
 from bson.objectid import ObjectId
